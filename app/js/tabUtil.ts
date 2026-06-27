@@ -168,6 +168,7 @@ export type TabLockStatus =
   | { locked: true; reason: "grouped" }
   | { locked: true; reason: "manual" }
   | { locked: true; reason: "pinned" }
+  | { locked: true; reason: "pinnedWindow" }
   | { locked: true; reason: "whitelist"; whitelistMatch: string }
   | { locked: true; reason: "window" };
 
@@ -176,18 +177,24 @@ export function getTabLockStatus(
   {
     filterAudio,
     filterGroupedTabs,
+    filterPinnedWindows,
     lockedIds,
     lockedWindowIds,
     whitelist,
+    windowHasPinnedTab,
   }: {
     filterAudio: boolean;
     filterGroupedTabs: boolean;
+    filterPinnedWindows: boolean;
     lockedIds: number[];
     lockedWindowIds: number[];
     whitelist: string[];
+    windowHasPinnedTab: boolean;
   },
 ): TabLockStatus {
   if (tab.pinned) return { locked: true, reason: "pinned" };
+  // A non-pinned tab is locked when its window contains a pinned tab and the setting is enabled.
+  if (filterPinnedWindows && windowHasPinnedTab) return { locked: true, reason: "pinnedWindow" };
   if (filterAudio && tab.audible) return { locked: true, reason: "audible" };
   if (filterGroupedTabs && "groupId" in tab && tab.groupId > 0)
     return { locked: true, reason: "grouped" };
@@ -205,9 +212,11 @@ export function isTabLocked(
   options: {
     filterAudio: boolean;
     filterGroupedTabs: boolean;
+    filterPinnedWindows: boolean;
     lockedIds: number[];
     lockedWindowIds: number[];
     whitelist: string[];
+    windowHasPinnedTab: boolean;
   },
 ): boolean {
   return getTabLockStatus(tab, options).locked;
@@ -243,14 +252,22 @@ export function findTabsToCloseCandidates(
 ): chrome.tabs.Tab[] {
   const cutOff = Date.now() - settings.stayOpen();
   const minTabs = settings.get("minTabs");
+  const filterPinnedWindows = settings.get("filterPinnedWindows");
+  // Windows containing at least one pinned tab. Computed from the in-scope `tabs`, which is one
+  // window's tabs for the "givenWindow" strategy and all tabs for "allWindows" — correct either way.
+  const windowIdsWithPinnedTab = filterPinnedWindows
+    ? new Set(tabs.filter((tab) => tab.pinned).map((tab) => tab.windowId))
+    : null;
   const unlockedTabs = tabs.filter(
     (tab) =>
       !isTabLocked(tab, {
         filterAudio: settings.get("filterAudio"),
         filterGroupedTabs: settings.get("filterGroupedTabs"),
+        filterPinnedWindows,
         lockedIds: settings.get("lockedIds"),
         lockedWindowIds: settings.get("lockedWindowIds"),
         whitelist: settings.get("whitelist"),
+        windowHasPinnedTab: windowIdsWithPinnedTab?.has(tab.windowId) ?? false,
       }),
   );
 

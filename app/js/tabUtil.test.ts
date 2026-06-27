@@ -239,9 +239,11 @@ describe("getTabLockStatus", () => {
   const defaultOptions = {
     filterAudio: false,
     filterGroupedTabs: false,
+    filterPinnedWindows: false,
     lockedIds: [],
     lockedWindowIds: [],
     whitelist: [],
+    windowHasPinnedTab: false,
   };
 
   test("returns not locked for a normal tab", () => {
@@ -289,6 +291,46 @@ describe("getTabLockStatus", () => {
         filterGroupedTabs: false,
       }),
     ).toEqual({ locked: false });
+  });
+
+  test("locks a tab in a pinned window when filterPinnedWindows is enabled", () => {
+    expect(
+      getTabLockStatus(createTab({ groupId: -1 }), {
+        ...defaultOptions,
+        filterPinnedWindows: true,
+        windowHasPinnedTab: true,
+      }),
+    ).toEqual({ locked: true, reason: "pinnedWindow" });
+  });
+
+  test("does not lock a tab in a pinned window when filterPinnedWindows is disabled", () => {
+    expect(
+      getTabLockStatus(createTab({ groupId: -1 }), {
+        ...defaultOptions,
+        filterPinnedWindows: false,
+        windowHasPinnedTab: true,
+      }),
+    ).toEqual({ locked: false });
+  });
+
+  test("does not lock a tab when its window has no pinned tab", () => {
+    expect(
+      getTabLockStatus(createTab({ groupId: -1 }), {
+        ...defaultOptions,
+        filterPinnedWindows: true,
+        windowHasPinnedTab: false,
+      }),
+    ).toEqual({ locked: false });
+  });
+
+  test("the pinned tab itself still reports the pinned reason", () => {
+    expect(
+      getTabLockStatus(createTab({ pinned: true }), {
+        ...defaultOptions,
+        filterPinnedWindows: true,
+        windowHasPinnedTab: true,
+      }),
+    ).toEqual({ locked: true, reason: "pinned" });
   });
 
   test("locks a tab whose URL matches the whitelist", () => {
@@ -396,7 +438,7 @@ describe("shouldFreezeActiveTabTimer", () => {
 describe("findTabsToCloseCandidates", () => {
   const OLD_TIME = 0; // always older than any real cutOff
 
-  function mockSettings({ minTabs = 2, stayOpen = 60_000 } = {}) {
+  function mockSettings({ minTabs = 2, stayOpen = 60_000, filterPinnedWindows = false } = {}) {
     settings.get = jest.fn().mockImplementation((key: string) => {
       switch (key) {
         case "minTabs":
@@ -405,6 +447,8 @@ describe("findTabsToCloseCandidates", () => {
           return false;
         case "filterGroupedTabs":
           return false;
+        case "filterPinnedWindows":
+          return filterPinnedWindows;
         case "lockedIds":
           return [];
         case "lockedWindowIds":
@@ -542,5 +586,31 @@ describe("findTabsToCloseCandidates", () => {
       [pinnedTab1, pinnedTab2, activeTab, oldTab],
     );
     expect(result).toHaveLength(0);
+  });
+
+  test("excludes all tabs in a window that has a pinned tab when filterPinnedWindows is enabled", () => {
+    mockSettings({ minTabs: 0, filterPinnedWindows: true });
+    // Window 1 has a pinned tab → none of its tabs (pinned or not) should be closed.
+    const pinnedTab = createTab({ id: 1, windowId: 1, pinned: true });
+    const siblingOldTab = createTab({ id: 2, windowId: 1, groupId: -1 });
+    // Window 2 has no pinned tab → its old tab is still closable.
+    const otherWindowOldTab = createTab({ id: 3, windowId: 2, groupId: -1 });
+    expect(
+      findTabsToCloseCandidates({ "1": OLD_TIME, "2": OLD_TIME, "3": OLD_TIME }, [
+        pinnedTab,
+        siblingOldTab,
+        otherWindowOldTab,
+      ]),
+    ).toEqual([otherWindowOldTab]);
+  });
+
+  test("does not exclude pinned-window siblings when filterPinnedWindows is disabled", () => {
+    mockSettings({ minTabs: 0, filterPinnedWindows: false });
+    const pinnedTab = createTab({ id: 1, windowId: 1, pinned: true });
+    const siblingOldTab = createTab({ id: 2, windowId: 1, groupId: -1 });
+    // Only the pinned tab itself is locked; its non-pinned sibling is still closable.
+    expect(
+      findTabsToCloseCandidates({ "1": OLD_TIME, "2": OLD_TIME }, [pinnedTab, siblingOldTab]),
+    ).toEqual([siblingOldTab]);
   });
 });

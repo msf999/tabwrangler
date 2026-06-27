@@ -37,7 +37,9 @@ export default function WindowCard({
   const minTabs = settings.get("minTabs");
   const minTabsStrategy = settings.get("minTabsStrategy");
   const segments = groupTabsIntoSegments(tabs);
-  const unlockedTabCount = tabs.filter((tab) => !settings.isTabLocked(tab)).length ?? 0;
+  const windowHasPinnedTab = settings.get("filterPinnedWindows") && tabs.some((tab) => tab.pinned);
+  const unlockedTabCount =
+    tabs.filter((tab) => !settings.isTabLocked(tab, { windowHasPinnedTab })).length ?? 0;
   const relevantUnlockedCount =
     minTabsStrategy === "allWindows" ? totalUnlockedTabCount : unlockedTabCount;
   const tabsWillAutoClose = relevantUnlockedCount > minTabs;
@@ -53,6 +55,7 @@ export default function WindowCard({
             tabGroup={segment.type === "group" ? tabGroupsById.get(segment.groupId) : undefined}
             tabTime={tabTimes == null || tab.id == null ? undefined : tabTimes[tab.id]}
             tabsWillAutoClose={tabsWillAutoClose}
+            windowHasPinnedTab={windowHasPinnedTab}
             windowId={windowId}
             windowLocked={isLocked}
             onToggleTab={onToggleTab}
