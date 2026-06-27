@@ -16,6 +16,7 @@ interface OpenTabRowProps {
   tabGroup?: chrome.tabGroups.TabGroup;
   tabTime: number | undefined;
   tabsWillAutoClose: boolean;
+  windowHasPinnedTab?: boolean;
   windowId: number;
   windowLocked: boolean;
   onToggleTab: (
@@ -33,11 +34,12 @@ export default function OpenTabRow({
   tabGroup,
   tabTime = Date.now(),
   tabsWillAutoClose,
+  windowHasPinnedTab = false,
   windowId,
   windowLocked,
   onToggleTab,
 }: OpenTabRowProps) {
-  const tabLockStatus = settings.getTabLockStatus(tab);
+  const tabLockStatus = settings.getTabLockStatus(tab, { windowHasPinnedTab });
   const { data: syncPersistData } = useStorageSyncPersistQuery();
   const now = useContext(UseNowContext);
   const paused = syncPersistData?.paused;
@@ -127,7 +129,7 @@ export default function OpenTabRow({
             <Button
               active={tabLockStatus.locked}
               className="rounded-circle"
-              disabled={!settings.isTabManuallyLockable(tab)}
+              disabled={!settings.isTabManuallyLockable(tab, { windowHasPinnedTab })}
               title={
                 tabLockStatus.locked
                   ? chrome.i18n.getMessage("tabLock_unlockTab")
@@ -219,6 +221,13 @@ function TabLockContent({
         break;
       case "pinned":
         reason = chrome.i18n.getMessage("tabLock_lockedReason_pinned");
+        break;
+      case "pinnedWindow":
+        reason = (
+          <abbr title={chrome.i18n.getMessage("tabLock_lockedReason_pinnedWindow_tooltip")}>
+            {chrome.i18n.getMessage("tabLock_lockedReason_pinnedWindow")}
+          </abbr>
+        );
         break;
       case "whitelist":
         reason = (

@@ -286,7 +286,7 @@ export default function OptionsTab() {
               {chrome.i18n.getMessage("options_option_filterAudio_label")}
             </label>
           </div>
-          <div className="form-check">
+          <div className="form-check mb-1">
             <input
               className="form-check-input"
               defaultChecked={settings.get("filterGroupedTabs")}
@@ -298,6 +298,19 @@ export default function OptionsTab() {
             />
             <label className="form-check-label" htmlFor="filterGroupedTabs">
               {chrome.i18n.getMessage("options_option_filterGroupedTabs_label")}
+            </label>
+          </div>
+          <div className="form-check">
+            <input
+              className="form-check-input"
+              defaultChecked={settings.get("filterPinnedWindows")}
+              id="filterPinnedWindows"
+              name="filterPinnedWindows"
+              onChange={handleSettingsChange}
+              type="checkbox"
+            />
+            <label className="form-check-label" htmlFor="filterPinnedWindows">
+              {chrome.i18n.getMessage("options_option_filterPinnedWindows_label")}
             </label>
           </div>
           <label className="form-label mt-3" htmlFor="maxTabs">

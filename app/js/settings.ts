@@ -22,6 +22,7 @@ export interface SettingsSchema {
   debounceOnActivated: boolean;
   filterAudio: boolean;
   filterGroupedTabs: boolean;
+  filterPinnedWindows: boolean;
   lockedIds: number[];
   lockedWindowIds: number[];
   lockTabSortOrder: LockTabSortOrderOption | null;
@@ -54,6 +55,9 @@ export const SETTINGS_DEFAULTS: SettingsSchema = {
 
   // Don't close tabs that are a member of a group.
   filterGroupedTabs: false,
+
+  // Don't close any tabs in a window that contains a pinned tab.
+  filterPinnedWindows: true,
 
   // An array of tabids which have been explicitly locked by the user.
   lockedIds: defaultLockedIds,
@@ -160,24 +164,33 @@ const Settings = {
     return getWhitelistMatch(url, { whitelist: this.get("whitelist") });
   },
 
-  getTabLockStatus(tab: chrome.tabs.Tab): TabLockStatus {
+  getTabLockStatus(
+    tab: chrome.tabs.Tab,
+    { windowHasPinnedTab = false }: { windowHasPinnedTab?: boolean } = {},
+  ): TabLockStatus {
     // Intentionally excludes `lockedWindowIds` so the UI checkbox reflects individual tab lock
     // state only. Window lock state is passed separately as a prop in the UI.
+    //
+    // `windowHasPinnedTab` is window-level context the caller must supply (the singleton has no
+    // access to sibling tabs); callers without it default to `false`, so the pinned-window rule is
+    // simply not applied there.
     return getTabLockStatus(tab, {
       filterAudio: this.get("filterAudio"),
       filterGroupedTabs: this.get("filterGroupedTabs"),
+      filterPinnedWindows: this.get("filterPinnedWindows"),
       lockedIds: this.get("lockedIds"),
       lockedWindowIds: [],
       whitelist: this.get("whitelist"),
+      windowHasPinnedTab,
     });
   },
 
-  isTabLocked(tab: chrome.tabs.Tab): boolean {
-    return this.getTabLockStatus(tab).locked;
+  isTabLocked(tab: chrome.tabs.Tab, opts?: { windowHasPinnedTab?: boolean }): boolean {
+    return this.getTabLockStatus(tab, opts).locked;
   },
 
-  isTabManuallyLockable(tab: chrome.tabs.Tab): boolean {
-    const status = this.getTabLockStatus(tab);
+  isTabManuallyLockable(tab: chrome.tabs.Tab, opts?: { windowHasPinnedTab?: boolean }): boolean {
+    const status = this.getTabLockStatus(tab, opts);
     return !status.locked || status.reason === "manual";
   },
 

@@ -200,7 +200,18 @@ export default function LockTab() {
     });
   }, [currSorter, currWindow?.id, tabTimesQuery.data, tabsQuery.data]);
 
-  const unlockedTabCount = tabsQuery.data?.filter((tab) => !settings.isTabLocked(tab)).length ?? 0;
+  const windowIdsWithPinnedTab: Set<number> = new Set(
+    settings.get("filterPinnedWindows")
+      ? (tabsQuery.data ?? []).filter((tab) => tab.pinned).map((tab) => tab.windowId)
+      : [],
+  );
+  const unlockedTabCount =
+    tabsQuery.data?.filter(
+      (tab) =>
+        !settings.isTabLocked(tab, {
+          windowHasPinnedTab: windowIdsWithPinnedTab.has(tab.windowId),
+        }),
+    ).length ?? 0;
   const { data: syncData } = useStorageSyncQuery();
   const lockedWindowIds: Set<number> = new Set(syncData?.lockedWindowIds ?? []);
 

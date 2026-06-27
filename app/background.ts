@@ -76,9 +76,13 @@ async function updateIcon(tab?: chrome.tabs.Tab): Promise<void> {
   const lockOptions = {
     filterAudio: settings.get("filterAudio"),
     filterGroupedTabs: settings.get("filterGroupedTabs"),
+    filterPinnedWindows: settings.get("filterPinnedWindows"),
     lockedIds: settings.get("lockedIds"),
     lockedWindowIds: settings.get("lockedWindowIds"),
     whitelist: settings.get("whitelist"),
+    // The toolbar icon intentionally does not reflect the pinned-window rule (it would require an
+    // extra window query for the active tab's siblings).
+    windowHasPinnedTab: false,
   };
 
   await chrome.action.setIcon({
